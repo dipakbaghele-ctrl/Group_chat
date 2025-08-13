@@ -40,28 +40,25 @@ cd group_chat
 
 
 2️⃣ Create virtual environment
-bash
-Copy
-Edit
+```bash
+
 python -m venv venv
 source venv/bin/activate   # Mac/Linux
 venv\Scripts\activate      # Windows
+
 3️⃣ Install dependencies
-bash
-Copy
-Edit
+```bash
+
 pip install -r requirements.txt
+
 4️⃣ Configure database
 Install PostgreSQL and create a database:
 
-sql
-Copy
-Edit
+'''sql
+
 CREATE DATABASE chat_app;
 Update your DB credentials in main.py or .env
 
 5️⃣ Run the app
-bash
-Copy
-Edit
+```bash
 uvicorn main:fastapi_app --reload
