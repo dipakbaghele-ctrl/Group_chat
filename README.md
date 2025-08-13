@@ -1,5 +1,7 @@
 # Group_chat
 A simple real-time group chat application built with FastAPI, Socket.IO, and PostgreSQL.
+# Objective:
+Build a real-time group chat application with FastAPI and Socket.IO, allowing users to join chat rooms, send messages, share images, and view chat history stored in PostgreSQL.
 
 ---
 
@@ -39,7 +41,7 @@ A simple real-time group chat app built with:
 ## ⚙️ Setup (Local Development)
 ### 1️⃣ Clone the repo
 ```bash
-    - git clone https://github.com/yourusername/group_chat.git
+    - git clone https://github.com/dipakbaghele-ctrl/Group_chat.git
     - cd group_chat
 
 2️⃣ Create virtual environment
