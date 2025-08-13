@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Realtime Group Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Socket.IO client -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  
+  <!-- Axios (for API calls) -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/style.css" />
+
+
+</head>
+<body class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 text-gray-900">
+  <div class="max-w-6xl mx-auto p-4 md:p-8">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl md:text-3xl font-bold">💬 Realtime Group Chat</h1>
+      <span id="statusDot" class="inline-flex items-center gap-2 text-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-red-500" id="connDot"></span>
+        <span id="connText">Disconnected</span>
+      </span>
+    </header>
+
+    <!-- Controls -->
+    <section class="grid md:grid-cols-3 gap-4 mb-6">
+      <!-- Profile & Room -->
+      <div class="glass rounded-2xl p-4 shadow">
+        <h2 class="font-semibold mb-3">Profile & Room</h2>
+        <label class="block text-sm mb-1">Your Name</label>
+        <input id="username" type="text" placeholder="e.g. Dipak"
+               class="w-full rounded-xl border p-2 mb-3" />
+
+        <label class="block text-sm mb-1">Room Name (Socket room)</label>
+        <input id="roomName" type="text" placeholder="e.g. general"
+               class="w-full rounded-xl border p-2 mb-3" />
+
+        <label class="block text-sm mb-1">Room ID (DB)</label>
+        <div class="flex gap-2">
+          <input id="roomId" type="number" placeholder="e.g. 1"
+                 class="w-full rounded-xl border p-2" />
+          <button id="btnLoadHistory"
+                  class="rounded-xl bg-slate-800 text-white px-3 py-2"
+                  title="Load recent messages">History</button>
+        </div>
+
+        <div class="flex gap-2 mt-4">
+          <button id="btnJoin" class="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2">
+            Join Room
+          </button>
+          <button id="btnLeave" class="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-4 py-2">
+            Leave Room
+          </button>
+        </div>
+      </div>
+
+      <!-- Create Room -->
+      <div class="glass rounded-2xl p-4 shadow">
+        <h2 class="font-semibold mb-3">Create New Room</h2>
+        <label class="block text-sm mb-1">Room Name</label>
+        <input id="newRoomName" type="text" placeholder="e.g. sports"
+               class="w-full rounded-xl border p-2 mb-3" />
+        <button id="btnCreateRoom" class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2">
+          Create Room
+        </button>
+        <p id="createRoomResult" class="text-sm mt-2 text-gray-600"></p>
+      </div>
+
+      <!-- Upload -->
+      <div class="glass rounded-2xl p-4 shadow">
+        <h2 class="font-semibold mb-3">Image Share</h2>
+        <input id="fileInput" type="file" accept="image/*"
+               class="w-full rounded-xl border p-2 mb-3 bg-white" />
+        <img id="preview" class="hidden w-full h-40 object-cover rounded-xl border mb-3" alt="preview">
+        <button id="btnUpload"
+                class="w-full rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-4 py-2">
+          Upload & Send Image
+        </button>
+        <p id="uploadMsg" class="text-sm mt-2 text-gray-600"></p>
+      </div>
+    </section>
+
+    <!-- Chat Window -->
+    <section class="glass rounded-2xl p-4 shadow">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold">Room: <span id="roomBadge" class="px-2 py-1 bg-indigo-100 rounded-lg">—</span></h2>
+        <button id="btnLoadMore"
+                class="text-sm rounded-lg border px-3 py-1 hover:bg-gray-50">
+          Load older messages
+        </button>
+      </div>
+
+      <div id="chat" class="h-[50vh] overflow-y-auto flex flex-col gap-2 p-2 bg-white/70 rounded-xl border"></div>
+
+      <div class="mt-3 flex gap-2">
+        <input id="messageInput" type="text" placeholder="Type your message..."
+               class="flex-1 rounded-xl border p-3" />
+        <button id="btnSend"
+                class="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3">
+          Send
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Custom JS -->
+  <script src="/static/app.js"></script>
+  <!-- <script src="app.js"></script> -->
+</body>
+</html>

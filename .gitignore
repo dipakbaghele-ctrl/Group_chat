@@ -1,0 +1,47 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+
+# Virtual environment
+env/
+venv/
+.venv/
+
+# Environment variables
+*.env
+.env.*
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database files (if using SQLite locally)
+*.db
+*.sqlite3
+
+# Uploaded media files
+uploads/
+media/
+
+# Node.js dependencies (if you have npm for frontend)
+node_modules/
+package-lock.json
+
+# Byte-compiled files
+*.egg-info/
+
+# Coverage / testing
+htmlcov/
+.tox/
+.coverage
+.pytest_cache/

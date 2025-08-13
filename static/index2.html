@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Realtime Group Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Tailwind CDN for pretty UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Socket.IO client -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <!-- Axios (for API calls) -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    /* subtle glass effect */
+    .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(8px); }
+    .msg-you { align-self: flex-end; background: #4f46e5; color: white; }
+    .msg-other { align-self: flex-start; background: #e5e7eb; color: #111827; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 text-gray-900">
+  <div class="max-w-6xl mx-auto p-4 md:p-8">
+    <header class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl md:text-3xl font-bold">💬 Realtime Group Chat</h1>
+      <span id="statusDot" class="inline-flex items-center gap-2 text-sm">
+        <span class="w-2.5 h-2.5 rounded-full bg-red-500" id="connDot"></span>
+        <span id="connText">Disconnected</span>
+      </span>
+    </header>
+
+    <!-- Controls -->
+    <section class="grid md:grid-cols-3 gap-4 mb-6">
+      <!-- Profile & Room -->
+      <div class="glass rounded-2xl p-4 shadow">
+        <h2 class="font-semibold mb-3">Profile & Room</h2>
+        <label class="block text-sm mb-1">Your Name</label>
+        <input id="username" type="text" placeholder="e.g. Dipak"
+               class="w-full rounded-xl border p-2 mb-3" />
+
+        <label class="block text-sm mb-1">Room Name (Socket room)</label>
+        <input id="roomName" type="text" placeholder="e.g. general"
+               class="w-full rounded-xl border p-2 mb-3" />
+
+        <label class="block text-sm mb-1">Room ID (DB)</label>
+        <div class="flex gap-2">
+          <input id="roomId" type="number" placeholder="e.g. 1"
+                 class="w-full rounded-xl border p-2" />
+          <button id="btnLoadHistory"
+                  class="rounded-xl bg-slate-800 text-white px-3 py-2"
+                  title="Load recent messages">History</button>
+        </div>
+
+        <div class="flex gap-2 mt-4">
+          <button id="btnJoin" class="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2">
+            Join Room
+          </button>
+          <button id="btnLeave" class="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-4 py-2">
+            Leave Room
+          </button>
+        </div>
+      </div>
+
+      <!-- Create Room -->
+      <div class="glass rounded-2xl p-4 shadow">
+        <h2 class="font-semibold mb-3">Create New Room</h2>
+        <label class="block text-sm mb-1">Room Name</label>
+        <input id="newRoomName" type="text" placeholder="e.g. sports"
+               class="w-full rounded-xl border p-2 mb-3" />
+        <button id="btnCreateRoom" class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2">
+          Create Room
+        </button>
+        <p id="createRoomResult" class="text-sm mt-2 text-gray-600"></p>
+      </div>
+
+      <!-- Upload -->
+      <div class="glass rounded-2xl p-4 shadow">
+        <h2 class="font-semibold mb-3">Image Share</h2>
+        <input id="fileInput" type="file" accept="image/*"
+               class="w-full rounded-xl border p-2 mb-3 bg-white" />
+        <img id="preview" class="hidden w-full h-40 object-cover rounded-xl border mb-3" alt="preview">
+        <button id="btnUpload"
+                class="w-full rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-4 py-2">
+          Upload & Send Image
+        </button>
+        <p id="uploadMsg" class="text-sm mt-2 text-gray-600"></p>
+      </div>
+    </section>
+
+    <!-- Chat Window -->
+    <section class="glass rounded-2xl p-4 shadow">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold">Room: <span id="roomBadge" class="px-2 py-1 bg-indigo-100 rounded-lg">—</span></h2>
+        <button id="btnLoadMore"
+                class="text-sm rounded-lg border px-3 py-1 hover:bg-gray-50">
+          Load older messages
+        </button>
+      </div>
+
+      <div id="chat" class="h-[50vh] overflow-y-auto flex flex-col gap-2 p-2 bg-white/70 rounded-xl border"></div>
+
+      <div class="mt-3 flex gap-2">
+        <input id="messageInput" type="text" placeholder="Type your message..."
+               class="flex-1 rounded-xl border p-3" />
+        <button id="btnSend"
+                class="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3">
+          Send
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ======== CONFIG ========
+    const BASE_URL = window.location.origin;              // e.g. http://127.0.0.1:8000
+    const API = {
+      createRoom: `${BASE_URL}/rooms/`,
+      getMessages: (roomId, skip=0, limit=20) => `${BASE_URL}/rooms/${roomId}/messages/?skip=${skip}&limit=${limit}`,
+      upload: `${BASE_URL}/upload/`
+    };
+
+    // ======== STATE ========
+    let socket = null;
+    let currentRoom = null;     // socket room name (string)
+    let currentRoomId = null;   // DB room id (number)
+    let username = null;
+    let skipCount = 0;          // for pagination
+
+    // ======== DOM ========
+    const chatEl = document.getElementById('chat');
+    const connDot = document.getElementById('connDot');
+    const connText = document.getElementById('connText');
+    const roomBadge = document.getElementById('roomBadge');
+
+    const el = id => document.getElementById(id);
+
+    // ======== UI HELPERS ========
+    function setConnected(yes) {
+      connDot.className = `w-2.5 h-2.5 rounded-full ${yes ? 'bg-emerald-500' : 'bg-red-500'}`;
+      connText.textContent = yes ? 'Connected' : 'Disconnected';
+    }
+
+    function appendMessage({ sender, content, content_type, timestamp }, isYou=false, prepend=false) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `max-w-[80%] px-3 py-2 rounded-2xl shadow ${isYou ? 'msg-you' : 'msg-other'}`;
+
+      const top = document.createElement('div');
+      top.className = `text-xs opacity-80 mb-1 ${isYou ? 'text-indigo-100' : 'text-gray-500'}`;
+      const timeStr = timestamp ? new Date(timestamp).toLocaleString() : new Date().toLocaleString();
+      top.textContent = `${sender} • ${timeStr}`;
+
+      let body;
+      if (content_type === 'image') {
+        body = document.createElement('img');
+        body.src = content;
+        body.alt = 'image';
+        body.className = 'rounded-xl border max-w-full';
+      } else {
+        body = document.createElement('div');
+        body.textContent = content;
+      }
+
+      wrapper.appendChild(top);
+      wrapper.appendChild(body);
+
+      const line = document.createElement('div');
+      line.className = 'flex';
+      line.appendChild(wrapper);
+
+      if (prepend) {
+        chatEl.prepend(line);
+      } else {
+        chatEl.appendChild(line);
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+    }
+
+    function toast(msg) {
+      const t = document.createElement('div');
+      t.textContent = msg;
+      t.className = 'fixed bottom-6 right-6 bg-black text-white px-4 py-2 rounded-xl shadow-lg opacity-90';
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2500);
+    }
+
+    // ======== SOCKET ========
+    function connectSocket() {
+      if (socket) return socket;
+
+      socket = io(BASE_URL, { transports: ['websocket'] });
+
+      socket.on('connect', () => setConnected(true));
+      socket.on('disconnect', () => setConnected(false));
+
+      socket.on('notification', (data) => {
+        toast(data.msg || 'Notification');
+      });
+
+      socket.on('receive_message', (data) => {
+        const isYou = data.sender === username;
+        appendMessage({
+          sender: data.sender,
+          content: data.content,
+          content_type: data.content_type || 'text',
+          timestamp: data.timestamp
+        }, isYou);
+      });
+
+      return socket;
+    }
+
+    // ======== ACTIONS ========
+    async function doCreateRoom() {
+      const name = el('newRoomName').value.trim();
+      if (!name) return toast('Enter room name');
+
+      try {
+        const res = await axios.post(API.createRoom, { name });
+        el('createRoomResult').textContent = `Room created: id=${res.data.id}, name=${res.data.name}`;
+        // Suggest filling room fields
+        el('roomId').value = res.data.id;
+        el('roomName').value = res.data.name;
+        toast('Room created ✅');
+      } catch (e) {
+        console.error(e);
+        toast('Failed to create room');
+      }
+    }
+
+    function doJoinRoom() {
+      username = el('username').value.trim();
+      currentRoom = el('roomName').value.trim();
+      currentRoomId = Number(el('roomId').value);
+
+      if (!username || !currentRoom || !currentRoomId) {
+        return toast('Enter username, room name, and room ID');
+      }
+
+      connectSocket();
+      socket.emit('join_room', { room: currentRoom, user: username });
+      roomBadge.textContent = `${currentRoom} (#${currentRoomId})`;
+      skipCount = 0;
+      chatEl.innerHTML = '';
+      loadHistory(true);
+    }
+
+    function doLeaveRoom() {
+      if (socket && currentRoom) {
+        socket.emit('leave_room', { room: currentRoom, user: username });
+        toast(`Left ${currentRoom}`);
+      }
+      currentRoom = null;
+      currentRoomId = null;
+      roomBadge.textContent = '—';
+    }
+
+    function doSend() {
+      const msg = el('messageInput').value.trim();
+      if (!msg || !socket || !currentRoom || !currentRoomId || !username) return;
+
+      socket.emit('send_message', {
+        room: currentRoom,
+        room_id: currentRoomId,
+        sender: username,
+        content: msg,
+        content_type: 'text'
+      });
+
+      // optimistic append
+      appendMessage({ sender: username, content: msg, content_type: 'text' }, true);
+      el('messageInput').value = '';
+    }
+
+    async function doUploadAndSend() {
+      const file = el('fileInput').files[0];
+      if (!file) return toast('Choose an image first');
+      if (!currentRoom || !currentRoomId || !username || !socket) return toast('Join a room first');
+
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        const res = await axios.post(API.upload, form, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        const url = res.data.url; // e.g. /uploads/xyz.png
+        // send as image message
+        socket.emit('send_message', {
+          room: currentRoom,
+          room_id: currentRoomId,
+          sender: username,
+          content: url,
+          content_type: 'image'
+        });
+        appendMessage({ sender: username, content: url, content_type: 'image' }, true);
+        el('uploadMsg').textContent = `Uploaded: ${res.data.filename}`;
+        el('fileInput').value = '';
+        el('preview').classList.add('hidden');
+      } catch (e) {
+        console.error(e);
+        toast('Upload failed');
+      }
+    }
+
+    async function loadHistory(initial=false) {
+      if (!currentRoomId) return;
+      try {
+        const res = await axios.get(API.getMessages(currentRoomId, skipCount, 20));
+        const list = res.data || [];
+        if (list.length === 0 && initial) {
+          appendMessage({ sender: 'System', content: 'No previous messages', content_type: 'text' }, false);
+        } else {
+          // prepend older messages, newest last
+          for (let i = list.length - 1; i >= 0; i--) {
+            const m = list[i];
+            appendMessage({
+              sender: m.sender,
+              content: m.content,
+              content_type: m.content_type,
+              timestamp: m.timestamp
+            }, m.sender === username, true);
+          }
+          skipCount += list.length;
+        }
+      } catch (e) {
+        console.error(e);
+        toast('Failed to load history');
+      }
+    }
+
+    // ======== EVENTS ========
+    el('btnCreateRoom').addEventListener('click', doCreateRoom);
+    el('btnJoin').addEventListener('click', doJoinRoom);
+    el('btnLeave').addEventListener('click', doLeaveRoom);
+    el('btnSend').addEventListener('click', doSend);
+    el('btnUpload').addEventListener('click', doUploadAndSend);
+    el('btnLoadHistory').addEventListener('click', () => loadHistory(true));
+    el('btnLoadMore').addEventListener('click', () => loadHistory(false));
+
+    // image preview
+    el('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const img = el('preview');
+      if (file) {
+        img.src = URL.createObjectURL(file);
+        img.classList.remove('hidden');
+      } else {
+        img.classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
