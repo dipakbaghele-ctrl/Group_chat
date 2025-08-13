@@ -28,6 +28,13 @@ A simple real-time group chat app built with:
 - **WebSocket Communication:** socket.io
 
 ---
+## Screenshot1
+
+![Chat Page1](screenshots/Group_chat_Screenshot.png)
+
+### Chat Page 2
+
+![Chat Page 2](screenshots/group_chat_Screenshot2.png)
 
 ## ⚙️ Setup (Local Development)
 ### 1️⃣ Clone the repo
